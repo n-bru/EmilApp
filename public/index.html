@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hintergrund-Wechsel</title>
+<style>
+  :root { --bg:#fff; --fg:#1b1b1f; --muted:#666; --accent:#4f46e5; --card:#f3f3f7; --err:#b00020; --ok:#0a7a3d; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#121214; --fg:#f1f1f4; --muted:#a0a0aa; --accent:#8b85ff; --card:#1e1e22; --err:#ff6b81; --ok:#4cd98a; } }
+  * { box-sizing: border-box; }
+  body { margin:0; font:17px/1.4 system-ui,sans-serif; background:var(--bg); color:var(--fg); }
+  main { max-width:30rem; margin:0 auto; padding:1rem 16px 3rem; }
+  h1 { font-size:1.5rem; margin:.5rem 0 1rem; }
+  .preview { display:block; width:9rem; aspect-ratio:1290/2796; object-fit:cover; border-radius:1rem; background:var(--card); margin:0 auto .5rem; }
+  .meta { text-align:center; color:var(--muted); font-size:.9rem; margin-bottom:1.5rem; }
+  label { display:block; margin:1rem 0 .25rem; font-weight:600; }
+  input[type=text], input[type=password] { width:100%; padding:.75rem; font-size:1rem; border:1px solid var(--muted); border-radius:.5rem; background:var(--bg); color:var(--fg); }
+  input[type=file] { width:100%; padding:.75rem 0; font-size:1rem; }
+  button { width:100%; margin-top:1.25rem; padding:.9rem; font-size:1.05rem; font-weight:600; border:0; border-radius:.6rem; background:var(--accent); color:#fff; }
+  button:disabled { opacity:.5; }
+  #msg { margin-top:1rem; min-height:1.4em; font-weight:600; }
+  #msg.err { color:var(--err); } #msg.ok { color:var(--ok); }
+  a { color:var(--accent); } footer { margin-top:2rem; text-align:center; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Neues Hintergrundbild</h1>
+  <img id="preview" class="preview" alt="Aktuelles Hintergrundbild" src="/bg.jpg" onerror="this.style.visibility='hidden'">
+  <p id="meta" class="meta">Lade …</p>
+
+  <form id="form">
+    <label for="file">Bild</label>
+    <input id="file" name="image" type="file" accept="image/*" required>
+    <label for="by">Dein Name (optional)</label>
+    <input id="by" name="by" type="text" maxlength="30" autocomplete="nickname">
+    <label for="code">Gruppen-Code</label>
+    <input id="code" type="password" autocomplete="current-password" required>
+    <button id="send" type="submit">Hochladen</button>
+    <p id="msg" role="status" aria-live="polite"></p>
+  </form>
+
+  <footer><a href="/anleitung">So richtest du es auf deinem Handy ein</a></footer>
+</main>
+<script>
+const $ = id => document.getElementById(id);
+const store = { get(k){ try { return localStorage.getItem(k) ?? ''; } catch { return ''; } },
+                set(k,v){ try { localStorage.setItem(k,v); } catch {} } };
+$('code').value = store.get('code'); $('by').value = store.get('by');
+
+async function loadMeta() {
+  try {
+    const m = await (await fetch('/api/current')).json();
+    $('meta').textContent = m.version
+      ? `Version ${m.version} · ${new Date(m.updatedAt).toLocaleString('de-DE')}${m.by ? ' · von ' + m.by : ''}`
+      : 'Noch kein Bild hochgeladen.';
+  } catch { $('meta').textContent = ''; }
+}
+loadMeta();
+
+$('form').addEventListener('submit', async e => {
+  e.preventDefault();
+  const msg = $('msg'); msg.className = ''; msg.textContent = 'Lade hoch …';
+  $('send').disabled = true;
+  try {
+    const fd = new FormData();
+    fd.append('by', $('by').value);
+    fd.append('image', $('file').files[0]);
+    const r = await fetch('/api/upload', { method:'POST', headers:{ 'x-upload-code': $('code').value }, body: fd });
+    const data = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(data.error || 'Upload fehlgeschlagen.');
+    store.set('code', $('code').value); store.set('by', $('by').value);
+    msg.className = 'ok'; msg.textContent = 'Fertig! Das Bild kommt bei der nächsten Aktualisierung auf die Handys.';
+    $('preview').style.visibility = 'visible'; $('preview').src = '/bg.jpg?v=' + data.version;
+    loadMeta(); $('form').reset(); $('code').value = store.get('code'); $('by').value = store.get('by');
+  } catch (err) {
+    msg.className = 'err'; msg.textContent = err.message;
+  } finally { $('send').disabled = false; }
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Einrichtung</title>
+<style>
+  :root { --bg:#fff; --fg:#1b1b1f; --muted:#666; --accent:#4f46e5; --card:#f3f3f7; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#121214; --fg:#f1f1f4; --muted:#a0a0aa; --accent:#8b85ff; --card:#1e1e22; } }
+  body { margin:0; font:17px/1.5 system-ui,sans-serif; background:var(--bg); color:var(--fg); }
+  main { max-width:34rem; margin:0 auto; padding:1rem 16px 3rem; }
+  h1 { font-size:1.5rem; } h2 { font-size:1.2rem; margin-top:2rem; }
+  code { background:var(--card); padding:.1rem .35rem; border-radius:.3rem; word-break:break-all; }
+  .box { background:var(--card); padding:.75rem 1rem; border-radius:.6rem; }
+  a { color:var(--accent); } li { margin:.4rem 0; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Einrichtung auf deinem Handy</h1>
+  <p>Eine Web-Seite darf dein Hintergrundbild nicht selbst ändern. Darum holt eine Automation auf deinem Handy das aktuelle Bild von dieser Adresse ab:</p>
+  <p class="box"><code id="url"></code></p>
+  <p>Du richtest das einmal ein und kannst es jederzeit wieder löschen. Nichts passiert ohne dich.</p>
+
+  <h2>iPhone (Kurzbefehle)</h2>
+  <ol>
+    <li>App <b>Kurzbefehle</b> öffnen → unten <b>Automation</b> → <b>+</b> → <b>Tageszeit</b>, z. B. 8:00 Uhr, <b>Täglich</b>.</li>
+    <li><b>Sofort ausführen</b> wählen, „Beim Ausführen benachrichtigen“ ausschalten.</li>
+    <li>Aktion <b>Inhalte von URL abrufen</b> hinzufügen. URL: die Adresse oben. Methode: GET.</li>
+    <li>Aktion <b>Hintergrundbild festlegen</b> hinzufügen. Eingabe: <i>Inhalte von URL</i>. Bei „Anzeigen“ <b>Sperrbildschirm</b> und/oder <b>Home-Bildschirm</b> wählen. „Vorschau anzeigen“ ausschalten.</li>
+    <li>Speichern. Mit <b>Ausführen</b> in der Automation kannst du es sofort testen.</li>
+  </ol>
+  <p class="box">Tipp: Bei der Aktion „Hintergrundbild festlegen“ ggf. „Perspektivzoom“ aus und „Weichzeichnen“ aus.</p>
+
+  <h2>Android (MacroDroid)</h2>
+  <ol>
+    <li>App <b>MacroDroid</b> installieren und die Berechtigungen zulassen.</li>
+    <li>Neues Makro. <b>Auslöser:</b> Datum/Zeit → Tageszeit (z. B. 8:00 Uhr).</li>
+    <li><b>Aktion:</b> Verbindung → <b>HTTP-Anfrage</b>, GET auf die Adresse oben, Antwort <b>in Datei speichern</b> (z. B. <code>/Download/bg.jpg</code>).</li>
+    <li><b>Aktion:</b> Gerät → <b>Hintergrundbild setzen</b> mit dieser Datei. Sperrbildschirm und/oder Startbildschirm wählen.</li>
+    <li>Makro speichern und einmal manuell testen. Bei Akku-Sparmodus MacroDroid von der Optimierung ausnehmen.</li>
+  </ol>
+
+  <h2>Hinweise</h2>
+  <ul>
+    <li>Das Bild wechselt zur eingestellten Uhrzeit, nicht sofort nach dem Upload.</li>
+    <li>Die Automation braucht Internet (WLAN oder mobile Daten).</li>
+    <li>Ausschalten: Automation bzw. Makro löschen.</li>
+  </ul>
+  <p><a href="/">← Zurück zum Upload</a></p>
+</main>
+<script>document.getElementById('url').textContent = location.origin + '/bg.jpg';</script>
+</body>
+</html>
