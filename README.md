@@ -18,10 +18,18 @@ npm test
 | Pfad | Zweck |
 |---|---|
 | `GET /` | Upload-Seite (handyfreundlich) |
-| `POST /api/upload` | Multipart `image` (+ optional `by`), Header `x-upload-code` |
-| `GET /bg.jpg` | aktuelles Bild, 1290×2796 JPEG, nie gecacht |
+| `POST /api/upload` | Multipart `image`, `to` (mehrfach: Personen-IDs oder `all`), optional `by`; Header `x-upload-code` |
+| `GET /bg.jpg` | gemeinsames Bild für alle, 1290×2796 JPEG, nie gecacht |
+| `GET /p/<token>.jpg` | persönliches Bild einer Person (Token = 32 Hex-Zeichen, unratbar) |
+| `GET/POST /api/recipients`, `DELETE /api/recipients/:id` | Personen verwalten (Header `x-upload-code`) |
 | `GET /api/current` | `{version, updatedAt, by}` |
 | `GET /anleitung` | Einrichtung für iPhone und Android |
+
+## Gezielt an Freund:innen senden
+Auf der Upload-Seite legst du Personen an (Spitznamen). Jede Person bekommt eine eigene, unratbare Bild-URL.
+Mit „Link“ kopierst du ihren Einrichtungs-Link (`/anleitung?t=…`), der die persönliche URL schon eingesetzt zeigt.
+Beim Upload wählst du eine, mehrere oder „Alle“ (gemeinsames Bild unter `/bg.jpg`) als Ziel.
+Personen und Links liegen in `DATA_DIR/recipients.json` (Volume sichern!).
 
 ## Hosting
 Es braucht dauerhaften Speicher für die Bilddatei. Reine Serverless-Hosts (Vercel/Netlify-Functions) haben keinen; dort müsste `src/app.js` auf Blob-Storage umgestellt werden.
@@ -35,4 +43,4 @@ Einfach: Container mit Volume (Fly.io, Railway, Render mit Disk, eigener Pi) –
 ## Offen / nächste Schritte
 - Teilbarer iOS-Kurzbefehl (iCloud-Link) und MacroDroid-Export: müssen auf echten Geräten erstellt werden.
 - Test mit je einem iPhone und Android.
-- Optional: Verlauf der letzten Bilder, Pro-Person-URLs, Widget-Variante.
+- Optional: Verlauf der letzten Bilder, Widget-Variante.

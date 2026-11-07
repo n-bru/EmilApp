@@ -49,6 +49,7 @@
   </ul>
   <p><a href="/">← Zurück zum Upload</a></p>
 </main>
-<script>document.getElementById('url').textContent = location.origin + '/bg.jpg';</script>
+<script>const t = new URLSearchParams(location.search).get('t');
+document.getElementById('url').textContent = location.origin + (/^[0-9a-f]{32}$/.test(t || '') ? `/p/${t}.jpg` : '/bg.jpg');</script>
 </body>
 </html>

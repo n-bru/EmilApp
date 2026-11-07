@@ -20,18 +20,36 @@
   button:disabled { opacity:.5; }
   #msg { margin-top:1rem; min-height:1.4em; font-weight:600; }
   #msg.err { color:var(--err); } #msg.ok { color:var(--ok); }
+  fieldset { border:1px solid var(--muted); border-radius:.5rem; margin:1rem 0 0; padding:.5rem .75rem; }
+  legend { font-weight:600; padding:0 .25rem; }
+  .row { display:flex; align-items:center; gap:.5rem; padding:.35rem 0; }
+  .row label { flex:1; margin:0; font-weight:400; display:flex; align-items:center; gap:.5rem; min-height:2.25rem; }
+  .row input[type=checkbox] { width:1.3rem; height:1.3rem; }
+  .small { width:auto; margin:0; padding:.4rem .7rem; font-size:.85rem; background:var(--card); color:var(--fg); border:1px solid var(--muted); }
+  .add { display:flex; gap:.5rem; margin-top:.5rem; } .add input { flex:1; } .add button { margin:0; width:auto; padding:.6rem 1rem; }
+  .hint { color:var(--muted); font-size:.9rem; margin:.25rem 0 0; }
   a { color:var(--accent); } footer { margin-top:2rem; text-align:center; }
 </style>
 </head>
 <body>
 <main>
   <h1>Neues Hintergrundbild</h1>
-  <img id="preview" class="preview" alt="Aktuelles Hintergrundbild" src="/bg.jpg" onerror="this.style.visibility='hidden'">
+  <img id="preview" class="preview" alt="Aktuelles Hintergrundbild" src="/bg.jpg" onerror="this.style.display='none'">
   <p id="meta" class="meta">Lade …</p>
 
   <form id="form">
     <label for="file">Bild</label>
     <input id="file" name="image" type="file" accept="image/*" required>
+    <fieldset id="targets">
+      <legend>Für wen?</legend>
+      <div class="row"><label><input type="checkbox" value="all" checked> Alle (gemeinsames Bild)</label></div>
+      <div id="people"></div>
+      <p class="hint" id="peopleHint">Gib zuerst den Gruppen-Code ein, um Personen zu sehen.</p>
+      <div class="add">
+        <input id="newName" type="text" maxlength="30" placeholder="Person hinzufügen (Spitzname)" aria-label="Name der neuen Person">
+        <button type="button" id="addBtn" class="small">+</button>
+      </div>
+    </fieldset>
     <label for="by">Dein Name (optional)</label>
     <input id="by" name="by" type="text" maxlength="30" autocomplete="nickname">
     <label for="code">Gruppen-Code</label>
@@ -47,35 +65,80 @@ const $ = id => document.getElementById(id);
 const store = { get(k){ try { return localStorage.getItem(k) ?? ''; } catch { return ''; } },
                 set(k,v){ try { localStorage.setItem(k,v); } catch {} } };
 $('code').value = store.get('code'); $('by').value = store.get('by');
+const say = (t, cls='') => { $('msg').className = cls; $('msg').textContent = t; };
+const api = (url, opt={}) => fetch(url, { ...opt, headers: { 'x-upload-code': $('code').value, ...(opt.headers||{}) } });
 
 async function loadMeta() {
   try {
     const m = await (await fetch('/api/current')).json();
     $('meta').textContent = m.version
-      ? `Version ${m.version} · ${new Date(m.updatedAt).toLocaleString('de-DE')}${m.by ? ' · von ' + m.by : ''}`
-      : 'Noch kein Bild hochgeladen.';
+      ? `Gemeinsames Bild: Version ${m.version} · ${new Date(m.updatedAt).toLocaleString('de-DE')}${m.by ? ' · von ' + m.by : ''}`
+      : 'Noch kein gemeinsames Bild.';
   } catch { $('meta').textContent = ''; }
 }
-loadMeta();
+
+function personUrl(p) { return `${location.origin}/p/${p.token}.jpg`; }
+
+async function loadPeople() {
+  const box = $('people'); box.replaceChildren();
+  if (!$('code').value) return;
+  const r = await api('/api/recipients').catch(() => null);
+  if (!r || !r.ok) { $('peopleHint').textContent = r && r.status === 401 ? 'Code stimmt nicht.' : 'Personen konnten nicht geladen werden.'; return; }
+  const list = await r.json();
+  $('peopleHint').textContent = list.length ? '' : 'Noch keine Personen. Füge unten die erste hinzu.';
+  const checked = new Set([...document.querySelectorAll('#targets input:checked')].map(c => c.value));
+  for (const p of list) {
+    const row = document.createElement('div'); row.className = 'row';
+    const lab = document.createElement('label');
+    const cb = document.createElement('input'); cb.type = 'checkbox'; cb.value = p.id; cb.checked = checked.has(p.id);
+    lab.append(cb, document.createTextNode(' ' + p.name + (p.version ? ` (v${p.version})` : '')));
+    const link = document.createElement('button'); link.type = 'button'; link.className = 'small'; link.textContent = 'Link';
+    link.onclick = async () => {
+      const setup = `${location.origin}/anleitung?t=${p.token}`;
+      try { await navigator.clipboard.writeText(setup); say(`Einrichtungs-Link für ${p.name} kopiert. Schick ihn nur an diese Person.`, 'ok'); }
+      catch { prompt('Einrichtungs-Link für ' + p.name, setup); }
+    };
+    const del = document.createElement('button'); del.type = 'button'; del.className = 'small'; del.textContent = '✕'; del.setAttribute('aria-label', p.name + ' entfernen');
+    del.onclick = async () => {
+      if (!confirm(p.name + ' entfernen? Der Link der Person funktioniert dann nicht mehr.')) return;
+      await api('/api/recipients/' + p.id, { method: 'DELETE' }); loadPeople();
+    };
+    row.append(lab, link, del); box.append(row);
+  }
+}
+$('code').addEventListener('change', loadPeople);
+
+$('addBtn').addEventListener('click', async () => {
+  const name = $('newName').value.trim(); if (!name) return;
+  const r = await api('/api/recipients', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ name }) });
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok) return say(d.error || 'Hinzufügen fehlgeschlagen.', 'err');
+  store.set('code', $('code').value); $('newName').value = '';
+  say(`${d.name} ist dabei. Tippe bei der Person auf „Link“, um den Einrichtungs-Link zu kopieren.`, 'ok');
+  loadPeople();
+});
+
+loadMeta(); loadPeople();
 
 $('form').addEventListener('submit', async e => {
   e.preventDefault();
-  const msg = $('msg'); msg.className = ''; msg.textContent = 'Lade hoch …';
-  $('send').disabled = true;
+  const targets = [...document.querySelectorAll('#targets input:checked')].map(c => c.value);
+  if (!targets.length) return say('Wähle mindestens eine Person oder „Alle“.', 'err');
+  say('Lade hoch …'); $('send').disabled = true;
   try {
     const fd = new FormData();
     fd.append('by', $('by').value);
+    targets.forEach(t => fd.append('to', t));
     fd.append('image', $('file').files[0]);
-    const r = await fetch('/api/upload', { method:'POST', headers:{ 'x-upload-code': $('code').value }, body: fd });
+    const r = await api('/api/upload', { method: 'POST', body: fd });
     const data = await r.json().catch(() => ({}));
     if (!r.ok) throw new Error(data.error || 'Upload fehlgeschlagen.');
     store.set('code', $('code').value); store.set('by', $('by').value);
-    msg.className = 'ok'; msg.textContent = 'Fertig! Das Bild kommt bei der nächsten Aktualisierung auf die Handys.';
-    $('preview').style.visibility = 'visible'; $('preview').src = '/bg.jpg?v=' + data.version;
-    loadMeta(); $('form').reset(); $('code').value = store.get('code'); $('by').value = store.get('by');
-  } catch (err) {
-    msg.className = 'err'; msg.textContent = err.message;
-  } finally { $('send').disabled = false; }
+    say(`Fertig! Gesendet an ${targets.length} Ziel${targets.length > 1 ? 'e' : ''}. Es kommt bei der nächsten Aktualisierung auf dem Handy an.`, 'ok');
+    if (targets.includes('all')) { $('preview').style.display = 'block'; $('preview').src = '/bg.jpg?v=' + Date.now(); }
+    loadMeta(); loadPeople(); $('file').value = '';
+  } catch (err) { say(err.message, 'err'); }
+  finally { $('send').disabled = false; }
 });
 </script>
 </body>
